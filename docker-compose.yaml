@@ -1,0 +1,19 @@
+---
+version: "3"
+services:
+
+  mariadb:
+    image: mariadb:10
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: juve
+    volumes:
+    - "./mariadb_data:/var/lib/mysql"
+
+  pythonapp:
+    image: silvereberdal/silverek8s-exo3:1.0.0
+    ports:
+    - 5000:5000
+    depends_on:
+    - mariadb
+    restart: always

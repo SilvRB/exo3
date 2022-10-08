@@ -1,0 +1,142 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: exo3
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: exo3
+  name: mariadb-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce # volume en lecture/écriture
+  resources:
+    requests:
+      storage: 2Gi # on demande 2 Go d'espace
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: exo3
+  name: exo3python
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exo3-python
+
+  template:
+    metadata:
+      labels:
+        app: exo3-python
+    spec:
+      containers:
+      - name: exo3-python-container
+        image: silvereberdal/silverek8s-exo3:1.0.0
+        ports:
+          - containerPort: 5000
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: exo3
+  name: exo3-python-srv
+
+spec:
+  type: NodePort
+  selector: 
+    app: exo3-python
+  ports:
+  - port: 5000 
+    targetPort: 5000 
+    nodePort: 32500 
+    protocol: TCP
+
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: autoscale-python
+  namespace: exo3
+spec:
+  maxReplicas: 8
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 70
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: exo3python
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: exo3
+  name: mariadb-pod
+  labels:
+    app: mariadb
+
+spec:
+  containers:
+  - name: mariadb-container
+    image: mariadb:10
+    env:
+    - name: MARIADB_ROOT_PASSWORD
+      value: juve
+    ports:
+      - containerPort: 3306
+    volumeMounts:
+    - name: mariadb-volume
+      mountPath: /var/lib/mysql
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  volumes:
+  - name: mariadb-volume
+    persistentVolumeClaim:
+      claimName: mariadb-pvc
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: exo3
+  name: mariadb
+
+spec:
+  type: ClusterIP
+  selector: 
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+    protocol: TCP
+
+...
